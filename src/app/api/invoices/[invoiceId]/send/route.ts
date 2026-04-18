@@ -6,6 +6,7 @@ import { getActiveCompany } from "@/lib/company-context";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { InvoicePdf } from "@/lib/pdf/invoice-generator";
 import { sendInvoiceEmail } from "@/lib/email/send-invoice";
+import { uploadFileToDrive } from "@/lib/drive/google-drive";
 import React from "react";
 import type { ReactElement } from "react";
 
@@ -83,13 +84,34 @@ export async function POST(
       recipientName: invoice.customer.name,
     });
 
+    // Upload PDF to Google Drive
+    let driveFileId: string | undefined;
+    let driveUrl: string | undefined;
+    try {
+      const driveResult = await uploadFileToDrive(
+        `faktura-${invoice.invoiceNumber}.pdf`,
+        "application/pdf",
+        pdfBuffer
+      );
+      if (driveResult) {
+        driveFileId = driveResult.fileId;
+        driveUrl = driveResult.webViewLink;
+      }
+    } catch (driveErr) {
+      console.warn("Drive-uppladdning misslyckades (icke-fatal):", driveErr instanceof Error ? driveErr.message : driveErr);
+    }
+
     // Update status
     await prisma.invoice.update({
       where: { id: invoice.id },
-      data: { status: "SENT", sentAt: new Date() },
+      data: {
+        status: "SENT",
+        sentAt: new Date(),
+        ...(driveFileId ? { driveFileId, driveUrl } : {}),
+      },
     });
 
-    return NextResponse.json({ message: "Faktura skickad!" });
+    return NextResponse.json({ message: "Faktura skickad!", driveUrl: driveUrl ?? null });
   } catch (error) {
     console.error("Send invoice error:", error);
     return NextResponse.json(

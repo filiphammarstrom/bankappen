@@ -193,6 +193,8 @@ model Invoice {
   yourReference  String?
   sentAt         DateTime?
   paidAt         DateTime?
+  driveFileId    String?
+  driveUrl       String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   company        Company       @relation(fields: [companyId], references: [id])
@@ -250,6 +252,8 @@ model Expense {
   reviewedAt       DateTime?
   reviewedByUserId String?
   notes            String?
+  driveFileId      String?
+  driveUrl         String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   company          Company       @relation(fields: [companyId], references: [id])
