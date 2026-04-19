@@ -48,6 +48,10 @@ export async function PATCH(
   const body = await req.json() as {
     status?: string;
     markPaid?: boolean;
+    paymentAmount?: number;
+    paymentDate?: string;
+    paymentMethod?: string;
+    paymentReference?: string;
   };
 
   try {
@@ -57,29 +61,51 @@ export async function PATCH(
       updates.status = body.status;
     }
 
-    if (body.markPaid && body.status === "PAID") {
-      updates.paidAt = new Date();
-      updates.paidAmountSek = invoice.totalSek;
+    if (body.markPaid) {
+      const amount = body.paymentAmount ?? Number(invoice.totalSek);
+      const alreadyPaid = Number(invoice.paidAmountSek);
+      const newPaidTotal = alreadyPaid + amount;
+      const remaining = Number(invoice.totalSek) - alreadyPaid;
 
-      // Create payment record
+      if (amount <= 0) {
+        return NextResponse.json({ error: "Beloppet måste vara positivt" }, { status: 400 });
+      }
+      if (amount > remaining + 0.01) {
+        return NextResponse.json(
+          { error: `Beloppet (${amount} kr) överstiger återstående skuld (${remaining.toFixed(2)} kr)` },
+          { status: 400 }
+        );
+      }
+
+      const paymentDate = body.paymentDate ? new Date(body.paymentDate) : new Date();
+      const isFullyPaid = newPaidTotal >= Number(invoice.totalSek) - 0.01;
+
+      updates.paidAmountSek = newPaidTotal;
+      if (isFullyPaid) {
+        updates.status = "PAID";
+        updates.paidAt = paymentDate;
+      } else {
+        updates.status = "PARTIALLY_PAID";
+      }
+
       const payment = await prisma.payment.create({
         data: {
           invoiceId: invoice.id,
-          amount: invoice.totalSek,
-          paymentDate: new Date(),
-          method: "BANK_TRANSFER",
+          amount,
+          paymentDate,
+          method: (body.paymentMethod as "BANK_TRANSFER" | "BANKGIRO" | "SWISH" | "CARD" | "OTHER") ?? "BANK_TRANSFER",
+          reference: body.paymentReference ?? null,
         },
       });
 
-      // Create journal entry for payment
       try {
         await createPaymentJournalEntry(
-          { id: payment.id, amount: Number(invoice.totalSek), paymentDate: new Date() },
+          { id: payment.id, amount, paymentDate },
           { id: invoice.id, invoiceNumber: invoice.invoiceNumber },
           company.id
         );
       } catch (err) {
-        console.error("Payment journal entry failed:", err);
+        console.error("Payment journal entry failed:", err instanceof Error ? err.message : err);
       }
     }
 
@@ -90,7 +116,7 @@ export async function PATCH(
 
     return NextResponse.json({ invoice: updated });
   } catch (error) {
-    console.error("Update invoice error:", error);
+    console.error("Update invoice error:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Kunde inte uppdatera faktura" }, { status: 500 });
   }
 }

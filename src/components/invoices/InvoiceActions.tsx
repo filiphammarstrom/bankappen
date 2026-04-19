@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Send, CheckCircle, MoreHorizontal } from "lucide-react";
+import { Download, Send, CheckCircle } from "lucide-react";
 import type { InvoiceStatus } from "@/types/invoice";
+import { PaymentModal } from "./PaymentModal";
 
 interface InvoiceActionsProps {
   invoice: {
     id: string;
     status: InvoiceStatus;
+    invoiceNumber: string;
+    totalSek: number;
+    paidAmountSek: number;
     customer: { email: string };
   };
 }
@@ -15,6 +19,7 @@ interface InvoiceActionsProps {
 export function InvoiceActions({ invoice }: InvoiceActionsProps) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   async function downloadPdf() {
     setLoading(true);
@@ -25,7 +30,7 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `faktura-${invoice.id}.pdf`;
+      a.download = `faktura-${invoice.invoiceNumber}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -59,60 +64,62 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
     }
   }
 
-  async function markPaid() {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/invoices/${invoice.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "PAID", markPaid: true }),
-      });
-      if (!res.ok) {
-        const data = await res.json() as { error?: string };
-        setMessage(data.error ?? "Kunde inte uppdatera status");
-      } else {
-        window.location.reload();
-      }
-    } catch {
-      setMessage("Ett fel uppstod");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const canPay =
+    invoice.status === "SENT" ||
+    invoice.status === "PARTIALLY_PAID" ||
+    invoice.status === "OVERDUE";
 
   return (
-    <div className="flex items-center gap-2">
-      {message && (
-        <span className="text-sm text-gray-600">{message}</span>
+    <>
+      {showPaymentModal && (
+        <PaymentModal
+          invoice={{
+            id: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            totalSek: invoice.totalSek,
+            paidAmountSek: invoice.paidAmountSek,
+          }}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={() => {
+            setShowPaymentModal(false);
+            window.location.reload();
+          }}
+        />
       )}
-      <button
-        onClick={downloadPdf}
-        disabled={loading}
-        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50"
-      >
-        <Download size={14} />
-        PDF
-      </button>
-      {invoice.status === "DRAFT" && (
+
+      <div className="flex items-center gap-2">
+        {message && <span className="text-sm text-gray-600">{message}</span>}
+
         <button
-          onClick={sendInvoice}
+          onClick={downloadPdf}
           disabled={loading}
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50"
         >
-          <Send size={14} />
-          Skicka
+          <Download size={14} />
+          PDF
         </button>
-      )}
-      {(invoice.status === "SENT" || invoice.status === "PARTIALLY_PAID" || invoice.status === "OVERDUE") && (
-        <button
-          onClick={markPaid}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-        >
-          <CheckCircle size={14} />
-          Markera betald
-        </button>
-      )}
-    </div>
+
+        {invoice.status === "DRAFT" && (
+          <button
+            onClick={sendInvoice}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            <Send size={14} />
+            Skicka
+          </button>
+        )}
+
+        {canPay && (
+          <button
+            onClick={() => setShowPaymentModal(true)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            <CheckCircle size={14} />
+            Registrera betalning
+          </button>
+        )}
+      </div>
+    </>
   );
 }

@@ -3,9 +3,9 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getActiveCompany } from "@/lib/company-context";
-import { formatCurrency, formatDate, toNumber } from "@/lib/utils";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { ReconcileList } from "@/components/bank/ReconcileList";
 
 export default async function ReconcilePage() {
   const session = await getServerSession(authOptions);
@@ -21,6 +21,19 @@ export default async function ReconcilePage() {
     },
     include: { bankConnection: { select: { accountName: true } } },
     orderBy: { transactionDate: "desc" },
+    take: 100,
+  });
+
+  const openInvoices = await prisma.invoice.findMany({
+    where: { companyId: company.id, status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE"] } },
+    select: { id: true, invoiceNumber: true, totalSek: true, customer: { select: { name: true } } },
+    orderBy: { dueDate: "asc" },
+  });
+
+  const openExpenses = await prisma.expense.findMany({
+    where: { companyId: company.id, status: "BOOKED" },
+    select: { id: true, supplierName: true, totalSek: true, invoiceNumber: true },
+    orderBy: { createdAt: "desc" },
     take: 50,
   });
 
@@ -38,44 +51,35 @@ export default async function ReconcilePage() {
 
       {unreconciled.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
-          Inga transaktioner att stämma av.
+          <p>Inga transaktioner att stämma av.</p>
+          <Link href="/bank/import" className="text-blue-600 hover:underline text-sm mt-2 inline-block">
+            Importera bankutdrag
+          </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Datum</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Beskrivning</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Belopp</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Konto</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {unreconciled.map((tx) => (
-                <tr key={tx.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">{formatDate(tx.transactionDate)}</td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium">{tx.merchantName ?? tx.description}</p>
-                    <p className="text-xs text-gray-400">{tx.bankConnection.accountName}</p>
-                  </td>
-                  <td className={`px-4 py-3 text-right font-medium ${toNumber(tx.amount) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {formatCurrency(toNumber(tx.amount))}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">
-                    {tx.category ?? "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button className="text-xs text-blue-600 hover:text-blue-700">
-                      Matcha
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ReconcileList
+          transactions={unreconciled.map((tx) => ({
+            id: tx.id,
+            transactionDate: tx.transactionDate.toISOString(),
+            description: tx.description,
+            merchantName: tx.merchantName,
+            amount: Number(tx.amount),
+            reconciled: tx.reconciled,
+            accountName: tx.bankConnection.accountName,
+          }))}
+          openInvoices={openInvoices.map((inv) => ({
+            id: inv.id,
+            invoiceNumber: inv.invoiceNumber,
+            customerName: inv.customer.name,
+            totalSek: Number(inv.totalSek),
+          }))}
+          openExpenses={openExpenses.map((exp) => ({
+            id: exp.id,
+            supplierName: exp.supplierName ?? "Okänd",
+            totalSek: Number(exp.totalSek ?? 0),
+            invoiceNumber: exp.invoiceNumber,
+          }))}
+        />
       )}
     </div>
   );

@@ -260,3 +260,46 @@ export async function createExpenseJournalEntry(
 
   return entry.id;
 }
+
+/**
+ * Create journal entry for paying a supplier invoice
+ * DR 2440 Leverantörsskulder
+ * CR 1930 Företagskonto
+ */
+export async function createExpensePaymentJournalEntry(
+  expense: { id: string; supplierName?: string | null; totalSek: number | { toNumber: () => number } | null },
+  companyId: string,
+  paymentDate: Date
+): Promise<string> {
+  const entryNumber = await getNextEntryNumber(companyId);
+  const amount = toNumber(expense.totalSek);
+  const account2440 = await getAccountId(companyId, 2440);
+  const account1930 = await getAccountId(companyId, 1930);
+
+  const entry = await prisma.journalEntry.create({
+    data: {
+      companyId,
+      entryNumber,
+      entryDate: paymentDate,
+      description: `Betalning utgift: ${expense.supplierName ?? "Okänd leverantör"}`,
+      source: "EXPENSE_BOOKED",
+      expenseId: expense.id,
+      lines: {
+        create: [
+          {
+            debitAccountId: account2440,
+            amountSek: amount,
+            description: "Reglering leverantörsskuld",
+          },
+          {
+            creditAccountId: account1930,
+            amountSek: amount,
+            description: expense.supplierName ?? "Leverantörsbetalning",
+          },
+        ],
+      },
+    },
+  });
+
+  return entry.id;
+}

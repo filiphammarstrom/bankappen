@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { validateCompanyAccess } from "@/lib/company-context";
-import { createExpenseJournalEntry } from "@/lib/accounting/journal-engine";
+import { createExpenseJournalEntry, createExpensePaymentJournalEntry } from "@/lib/accounting/journal-engine";
 import { z } from "zod";
 
 const UpdateExpenseSchema = z.object({
@@ -19,6 +19,8 @@ const UpdateExpenseSchema = z.object({
   notes: z.string().optional(),
   status: z.enum(["PENDING_REVIEW", "APPROVED", "REJECTED", "BOOKED"]).optional(),
   createJournalEntry: z.boolean().optional(),
+  markPaid: z.boolean().optional(),
+  paymentDate: z.string().optional(),
 });
 
 export async function PATCH(
@@ -85,7 +87,19 @@ export async function PATCH(
       );
     } catch (err) {
       console.error("Journal entry för utgift misslyckades:", err instanceof Error ? err.message : err);
-      // Non-fatal: expense is still saved as BOOKED
+    }
+  }
+
+  if (data.markPaid && updated.status === "BOOKED") {
+    const paymentDate = data.paymentDate ? new Date(data.paymentDate) : new Date();
+    try {
+      await createExpensePaymentJournalEntry(
+        { id: updated.id, supplierName: updated.supplierName, totalSek: updated.totalSek },
+        expense.companyId,
+        paymentDate
+      );
+    } catch (err) {
+      console.error("Betalnings-journal entry för utgift misslyckades:", err instanceof Error ? err.message : err);
     }
   }
 

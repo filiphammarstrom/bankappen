@@ -14,6 +14,9 @@ export function OcrReviewForm({ expense }: OcrReviewFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [paymentDate, setPaymentDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
 
   const [supplierName, setSupplierName] = useState(expense.supplierName ?? "");
   const [invoiceNumber, setInvoiceNumber] = useState(expense.invoiceNumber ?? "");
@@ -220,6 +223,44 @@ export function OcrReviewForm({ expense }: OcrReviewFormProps) {
             <span>Totalt</span>
             <span>{formatCurrency(parseFloat(totalSek))}</span>
           </div>
+        </div>
+      )}
+
+      {expense.status === "BOOKED" && (
+        <div className="border-t pt-4 space-y-3">
+          <p className="text-sm font-medium text-gray-700">Registrera betalning till leverantören</p>
+          <div className="flex items-center gap-3">
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+            />
+            <button
+              onClick={async () => {
+                setError("");
+                setLoading(true);
+                try {
+                  const res = await fetch(`/api/expenses/${expense.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ markPaid: true, paymentDate, status: "BOOKED" }),
+                  });
+                  const data = await res.json() as { error?: string };
+                  if (!res.ok) { setError(data.error ?? "Fel"); return; }
+                  router.push("/expenses");
+                } catch { setError("Nätverksfel"); }
+                finally { setLoading(false); }
+              }}
+              disabled={loading}
+              className="px-4 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+            >
+              Markera betald
+            </button>
+          </div>
+          <p className="text-xs text-gray-500">
+            Bokför DR 2440 Leverantörsskulder → CR 1930 Företagskonto
+          </p>
         </div>
       )}
 

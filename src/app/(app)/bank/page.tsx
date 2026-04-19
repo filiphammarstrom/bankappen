@@ -31,13 +31,21 @@ export default async function BankPage() {
           <h1 className="text-2xl font-bold text-gray-900">Bank</h1>
           <p className="text-gray-500">{company.name}</p>
         </div>
-        <Link
-          href="/bank/connect"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          <Link2 size={16} />
-          Anslut bank
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/bank/import"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            Importera bankutdrag
+          </Link>
+          <Link
+            href="/bank/connect"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            <Link2 size={16} />
+            Anslut bank
+          </Link>
+        </div>
       </div>
 
       {/* Stub notice */}
