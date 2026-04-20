@@ -1,8 +1,8 @@
 export const dynamic = "force-dynamic";
 
-import dynamic from "next/dynamic";
+import dynamicImport from "next/dynamic";
 
-const BankImportClient = dynamic(
+const BankImportClient = dynamicImport(
   () => import("@/components/bank/BankImportClient"),
   { ssr: false }
 );
