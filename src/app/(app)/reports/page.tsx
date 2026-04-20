@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { BarChart3, TrendingUp, Scale, Calculator } from "lucide-react";
 
