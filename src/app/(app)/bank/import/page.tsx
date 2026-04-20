@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, File, X, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
+import { Upload, File as FileIcon, X, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 type UploadState =
@@ -91,7 +91,7 @@ export default function BankImportPage() {
         <p className="text-gray-600 font-medium mb-1">Dra och släpp CSV-fil här</p>
         <p className="text-sm text-gray-400 mb-4">eller</p>
         <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
-          <File size={16} />
+          <FileIcon size={16} />
           Välj fil
           <input
             type="file"
@@ -107,7 +107,7 @@ export default function BankImportPage() {
       {file && state.status === "idle" && (
         <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
           <div className="flex items-center gap-3">
-            <File size={18} className="text-gray-400" />
+            <FileIcon size={18} className="text-gray-400" />
             <div>
               <p className="text-sm font-medium">{file.name}</p>
               <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(0)} KB</p>
