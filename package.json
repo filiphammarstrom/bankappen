@@ -38,6 +38,12 @@
     "tailwind-merge": "^2.3.0",
     "zod": "^3.23.8"
   },
+  "overrides": {
+    "@react-email/render": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
+  },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
