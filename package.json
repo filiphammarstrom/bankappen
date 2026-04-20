@@ -42,6 +42,10 @@
     "@react-email/render": {
       "react": "$react",
       "react-dom": "$react-dom"
+    },
+    "@react-pdf/renderer": {
+      "react": "$react",
+      "react-dom": "$react-dom"
     }
   },
   "devDependencies": {
