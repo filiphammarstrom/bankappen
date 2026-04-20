@@ -65,7 +65,7 @@ export default async function InvoiceDetailPage({
             </div>
           </div>
         </div>
-        <InvoiceActions invoice={{ id: invoice.id, status: invoice.status as InvoiceStatus, customer: { email: invoice.customer.email ?? "" } }} />
+        <InvoiceActions invoice={{ id: invoice.id, status: invoice.status as InvoiceStatus, invoiceNumber: invoice.invoiceNumber, totalSek: toNumber(invoice.totalSek), paidAmountSek: toNumber(invoice.paidAmountSek), customer: { email: invoice.customer.email ?? "" } }} />
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-6">
