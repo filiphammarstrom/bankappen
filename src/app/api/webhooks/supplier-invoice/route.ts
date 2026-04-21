@@ -77,8 +77,11 @@ function normalise(body: unknown) {
 }
 
 export async function POST(req: Request) {
-  // Validate webhook secret
-  const secret = req.headers.get("x-webhook-secret") ?? req.headers.get("x-postmark-inbound-webhook-token");
+  // Validate webhook secret via query param (?secret=...) or header
+  const url = new URL(req.url);
+  const querySecret = url.searchParams.get("secret");
+  const headerSecret = req.headers.get("x-webhook-secret");
+  const secret = querySecret ?? headerSecret;
   if (process.env.WEBHOOK_SECRET && secret !== process.env.WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Ogiltig webhook-nyckel" }, { status: 401 });
   }
