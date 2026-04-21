@@ -117,17 +117,23 @@ export async function POST(req: Request) {
 
   let ocrData = parsedExpenseToOcrData(parsed);
 
-  // Find PDF attachment
+  // Find PDF or image attachment
   const pdfAttachment = attachments.find(
     (a) => a.contentType === "application/pdf" || a.filename?.toLowerCase().endsWith(".pdf")
   );
+  const imageAttachment = !pdfAttachment ? attachments.find(
+    (a) =>
+      a.contentType?.startsWith("image/") ||
+      /\.(jpe?g|png|gif|webp|tiff?)$/i.test(a.filename ?? "")
+  ) : undefined;
+  const fileAttachment = pdfAttachment ?? imageAttachment;
+  const fileMimeType = pdfAttachment ? "application/pdf" : (imageAttachment?.contentType ?? "image/jpeg");
 
-  // OCR the PDF if present
-  if (pdfAttachment?.content) {
+  // OCR the attachment if present
+  if (fileAttachment?.content) {
     try {
-      const pdfBuffer = Buffer.from(pdfAttachment.content, "base64");
-      const visionData = await extractReceiptData(pdfBuffer, "application/pdf");
-      // Merge — Vision results take precedence where available
+      const fileBuffer = Buffer.from(fileAttachment.content, "base64");
+      const visionData = await extractReceiptData(fileBuffer, fileMimeType);
       ocrData = {
         ...ocrData,
         ...Object.fromEntries(
@@ -139,13 +145,13 @@ export async function POST(req: Request) {
     }
   }
 
-  // Upload PDF to Google Drive
+  // Upload attachment to Google Drive
   let driveFileId: string | null = null;
   let driveUrl: string | null = null;
-  if (pdfAttachment?.content) {
-    const pdfBuffer = Buffer.from(pdfAttachment.content, "base64");
-    const filename = pdfAttachment.filename ?? `leverantörsfaktura-${Date.now()}.pdf`;
-    const result = await uploadFileToDrive(filename, "application/pdf", pdfBuffer);
+  if (fileAttachment?.content) {
+    const fileBuffer = Buffer.from(fileAttachment.content, "base64");
+    const filename = fileAttachment.filename ?? `leverantörsfaktura-${Date.now()}`;
+    const result = await uploadFileToDrive(filename, fileMimeType, fileBuffer);
     if (result) {
       driveFileId = result.fileId;
       driveUrl = result.webViewLink;
