@@ -11,9 +11,14 @@ interface InboundEmailBoxProps {
 export function InboundEmailBox({ companyId, companyName }: InboundEmailBoxProps) {
   const [copied, setCopied] = useState(false);
 
-  const inboundDomain =
-    process.env.NEXT_PUBLIC_POSTMARK_INBOUND_DOMAIN ?? "inbound.postmarkapp.com";
-  const emailAddress = `kvitton+${companyId}@${inboundDomain}`;
+  const inboundAddress =
+    process.env.NEXT_PUBLIC_POSTMARK_INBOUND_ADDRESS ?? "";
+
+  const emailAddress = inboundAddress.includes("@")
+    ? inboundAddress.replace("@", `+${companyId}@`)
+    : `kvitton+${companyId}@inbound.postmarkapp.com`;
+
+  const isConfigured = !!inboundAddress;
 
   function handleCopy() {
     navigator.clipboard.writeText(emailAddress).then(() => {
@@ -56,11 +61,13 @@ export function InboundEmailBox({ companyId, companyName }: InboundEmailBoxProps
               )}
             </button>
           </div>
-          <p className="text-xs text-blue-600 mt-2">
-            Kräver att Postmark Inbound är konfigurerat och{" "}
-            <code className="bg-blue-100 px-1 rounded">NEXT_PUBLIC_POSTMARK_INBOUND_DOMAIN</code>{" "}
-            är satt i miljövariabler.
-          </p>
+          {!isConfigured && (
+            <p className="text-xs text-blue-600 mt-2">
+              Kräver att Postmark Inbound är konfigurerat och{" "}
+              <code className="bg-blue-100 px-1 rounded">NEXT_PUBLIC_POSTMARK_INBOUND_ADDRESS</code>{" "}
+              är satt i miljövariabler.
+            </p>
+          )}
         </div>
       </div>
     </div>
