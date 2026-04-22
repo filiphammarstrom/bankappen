@@ -1,16 +1,15 @@
-import { Resend } from "resend";
+import * as postmark from "postmark";
 import type { InvoiceWithLines } from "@/types/invoice";
 
-// Lazy initialization to avoid build-time error when API key is not set
-let _resend: Resend | null = null;
-function getResend(): Resend {
-  if (!_resend) {
-    if (!process.env.RESEND_API_KEY) {
-      throw new Error("RESEND_API_KEY inte konfigurerad");
+let _client: postmark.ServerClient | null = null;
+function getClient(): postmark.ServerClient {
+  if (!_client) {
+    if (!process.env.POSTMARK_SERVER_TOKEN) {
+      throw new Error("POSTMARK_SERVER_TOKEN inte konfigurerad");
     }
-    _resend = new Resend(process.env.RESEND_API_KEY);
+    _client = new postmark.ServerClient(process.env.POSTMARK_SERVER_TOKEN);
   }
-  return _resend;
+  return _client;
 }
 
 interface SendInvoiceOptions {
@@ -33,8 +32,8 @@ export async function sendInvoiceEmail({
   recipientEmail,
   recipientName,
 }: SendInvoiceOptions): Promise<{ id: string }> {
-  const fromEmail = company.email ?? process.env.RESEND_FROM_EMAIL ?? "faktura@noreply.se";
-  const resend = getResend();
+  const fromEmail = company.email ?? process.env.POSTMARK_FROM_EMAIL ?? "faktura@noreply.se";
+  const client = getClient();
   const total = typeof invoice.totalSek === "number" ? invoice.totalSek : Number(invoice.totalSek);
   const formattedTotal = new Intl.NumberFormat("sv-SE", {
     minimumFractionDigits: 2,
@@ -105,22 +104,19 @@ export async function sendInvoiceEmail({
 </body>
 </html>`;
 
-  const result = await resend.emails.send({
-    from: `${company.name} <${fromEmail}>`,
-    to: [recipientEmail],
-    subject: `Faktura ${invoice.invoiceNumber} från ${company.name}`,
-    html,
-    attachments: [
+  const result = await client.sendEmail({
+    From: `${company.name} <${fromEmail}>`,
+    To: recipientEmail,
+    Subject: `Faktura ${invoice.invoiceNumber} från ${company.name}`,
+    HtmlBody: html,
+    Attachments: [
       {
-        filename: `faktura-${invoice.invoiceNumber}.pdf`,
-        content: pdfBuffer,
+        Name: `faktura-${invoice.invoiceNumber}.pdf`,
+        Content: pdfBuffer.toString("base64"),
+        ContentType: "application/pdf",
       },
     ],
   });
 
-  if (result.error) {
-    throw new Error(`E-post kunde inte skickas: ${result.error.message}`);
-  }
-
-  return { id: result.data?.id ?? "" };
+  return { id: String(result.MessageID) };
 }
