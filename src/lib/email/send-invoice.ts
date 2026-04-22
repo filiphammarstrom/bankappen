@@ -114,6 +114,7 @@ export async function sendInvoiceEmail({
         Name: `faktura-${invoice.invoiceNumber}.pdf`,
         Content: pdfBuffer.toString("base64"),
         ContentType: "application/pdf",
+        ContentID: "",
       },
     ],
   });
