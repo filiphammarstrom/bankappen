@@ -33,7 +33,7 @@ export async function sendInvoiceEmail({
   recipientEmail,
   recipientName,
 }: SendInvoiceOptions): Promise<{ id: string }> {
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "faktura@noreply.se";
+  const fromEmail = company.email ?? process.env.RESEND_FROM_EMAIL ?? "faktura@noreply.se";
   const resend = getResend();
   const total = typeof invoice.totalSek === "number" ? invoice.totalSek : Number(invoice.totalSek);
   const formattedTotal = new Intl.NumberFormat("sv-SE", {
