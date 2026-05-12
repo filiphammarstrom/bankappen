@@ -14,6 +14,7 @@ import {
   Calculator,
   Settings,
   LogOut,
+  CreditCard,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { CompanySwitcher } from "./CompanySwitcher";
@@ -29,6 +30,7 @@ const navItems: NavItem[] = [
   { href: "/invoices", label: "Fakturor", icon: <FileText size={18} /> },
   { href: "/customers", label: "Kunder", icon: <Users size={18} /> },
   { href: "/expenses", label: "Utgifter", icon: <Receipt size={18} /> },
+  { href: "/betalningar", label: "Betalningar", icon: <CreditCard size={18} /> },
   { href: "/bank", label: "Bank", icon: <Landmark size={18} /> },
   { href: "/reports", label: "Rapporter", icon: <BarChart3 size={18} /> },
   { href: "/tax", label: "Skatt", icon: <Calculator size={18} /> },
