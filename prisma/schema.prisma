@@ -256,6 +256,8 @@ model Expense {
   notes            String?
   driveFileId      String?
   driveUrl         String?
+  isSubscription   Boolean       @default(false)
+  subscriptionInterval String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   company          Company       @relation(fields: [companyId], references: [id])

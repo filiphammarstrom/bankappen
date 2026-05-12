@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseExpenseEmail, parsedExpenseToOcrData } from "@/lib/email/parse-expense";
+import { detectSubscription } from "@/lib/subscriptions/detect";
 import { extractReceiptData } from "@/lib/ocr/google-vision";
 import { uploadFileToDrive } from "@/lib/drive/google-drive";
 
@@ -190,6 +191,26 @@ export async function POST(req: Request) {
       driveUrl,
     },
   });
+
+  // Detect subscription in background (non-blocking)
+  const supplierForDetect = expense.supplierName ?? "";
+  if (supplierForDetect) {
+    detectSubscription(
+      supplierForDetect,
+      expense.description,
+      expense.totalSek ? Number(expense.totalSek) : null,
+      subject
+    )
+      .then((result) => {
+        if (result.isSubscription) {
+          return prisma.expense.update({
+            where: { id: expense.id },
+            data: { isSubscription: true, subscriptionInterval: result.interval ?? "MONTHLY" },
+          });
+        }
+      })
+      .catch((err) => console.warn("Subscription detection failed:", err));
+  }
 
   return NextResponse.json({ ok: true, expenseId: expense.id }, { status: 201 });
 }
