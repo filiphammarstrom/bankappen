@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { InboundEmailBox } from "@/components/expenses/InboundEmailBox";
 import { CompanySettingsForm } from "@/components/companies/CompanySettingsForm";
+import { StripeSettings } from "@/components/companies/StripeSettings";
 
 export default async function CompanySettingsPage({
   params,
@@ -59,6 +60,16 @@ export default async function CompanySettingsPage({
       <div className="mt-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-3">Inkommande e-post</h2>
         <InboundEmailBox companyId={company.id} companyName={company.name} />
+      </div>
+
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Stripe — kortbetalningar</h2>
+        <StripeSettings
+          companyId={company.id}
+          stripeEnabled={company.stripeEnabled}
+          stripeAccountId={company.stripeAccountId}
+          stripeConfigured={!!process.env.STRIPE_CLIENT_ID}
+        />
       </div>
 
       <div className="mt-6">

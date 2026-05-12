@@ -51,9 +51,9 @@ export async function POST(
   };
 
   try {
-    // Create Stripe checkout session if configured
+    // Create Stripe checkout session if enabled for this company
     let paymentUrl: string | null = null;
-    if (process.env.STRIPE_SECRET_KEY) {
+    if (process.env.STRIPE_SECRET_KEY && company.stripeEnabled && company.stripeAccountId) {
       try {
         const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2026-04-22.dahlia" });
         const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://bankappen.vercel.app";
@@ -74,7 +74,7 @@ export async function POST(
           success_url: `${appUrl}/invoices/${invoice.id}?paid=1`,
           cancel_url: `${appUrl}/invoices/${invoice.id}`,
           expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
-        });
+        }, { stripeAccount: company.stripeAccountId });
         paymentUrl = session.url;
       } catch (stripeErr) {
         console.warn("Stripe checkout skapades inte:", stripeErr instanceof Error ? stripeErr.message : stripeErr);
