@@ -23,6 +23,7 @@ interface SendInvoiceOptions {
   pdfBuffer: Buffer;
   recipientEmail: string;
   recipientName: string;
+  paymentUrl?: string | null;
 }
 
 export async function sendInvoiceEmail({
@@ -31,6 +32,7 @@ export async function sendInvoiceEmail({
   pdfBuffer,
   recipientEmail,
   recipientName,
+  paymentUrl,
 }: SendInvoiceOptions): Promise<{ id: string }> {
   const fromEmail = company.email ?? process.env.POSTMARK_FROM_EMAIL ?? "faktura@noreply.se";
   const client = getClient();
@@ -89,6 +91,14 @@ export async function sendInvoiceEmail({
       </div>
 
       ${company.bankgiro ? `<p><strong>Bankgiro:</strong> ${company.bankgiro}<br><strong>OCR:</strong> ${invoice.invoiceNumber}</p>` : ""}
+
+      ${paymentUrl ? `
+      <div style="text-align:center;margin:24px 0">
+        <a href="${paymentUrl}" style="background:#1d4ed8;color:white;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block">
+          Betala nu med kort
+        </a>
+        <p style="font-size:11px;color:#9ca3af;margin-top:8px">Säker betalning via Stripe</p>
+      </div>` : ""}
 
       ${invoice.notes ? `<p><em>${invoice.notes}</em></p>` : ""}
 
