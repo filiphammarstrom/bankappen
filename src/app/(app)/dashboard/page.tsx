@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getActiveCompany } from "@/lib/company-context";
 import { formatCurrency, formatDate, toNumber } from "@/lib/utils";
 import Link from "next/link";
-import { FileText, TrendingUp, AlertCircle, Clock } from "lucide-react";
+import { FileText, TrendingUp, AlertCircle, Clock, ShieldCheck } from "lucide-react";
+import { runHealthCheck } from "@/lib/health/check";
 
 async function getDashboardData(companyId: string) {
   const now = new Date();
@@ -84,7 +85,10 @@ export default async function DashboardPage() {
     );
   }
 
-  const data = await getDashboardData(company.id);
+  const [data, healthIssues] = await Promise.all([
+    getDashboardData(company.id),
+    runHealthCheck(company.id),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -92,6 +96,33 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900">Översikt</h1>
         <p className="text-gray-500">{company.name} · {new Date().toLocaleDateString("sv-SE", { month: "long", year: "numeric" })}</p>
       </div>
+
+      {/* Health check */}
+      {healthIssues.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50">
+            <ShieldCheck size={16} className="text-gray-500" />
+            <h2 className="text-sm font-semibold text-gray-700">Hälsokoll — {healthIssues.length} sak{healthIssues.length > 1 ? "er" : ""} att åtgärda</h2>
+          </div>
+          <ul className="divide-y divide-gray-50">
+            {healthIssues.map((issue, i) => (
+              <li key={i}>
+                <Link
+                  href={issue.link ?? "#"}
+                  className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="mt-0.5 flex-shrink-0">
+                    {issue.severity === "error" && <AlertCircle size={15} className="text-red-500" />}
+                    {issue.severity === "warning" && <AlertCircle size={15} className="text-amber-500" />}
+                    {issue.severity === "info" && <AlertCircle size={15} className="text-blue-400" />}
+                  </span>
+                  <span className="text-sm text-gray-700">{issue.message}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
