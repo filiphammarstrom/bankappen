@@ -33,6 +33,10 @@ export function SiePage({ companyId }: { companyId: string }) {
         method: "POST",
         body: formData,
       });
+      if (!res.ok && res.headers.get("content-type")?.includes("text/html")) {
+        setImportError(`Servern svarade med fel ${res.status} – filen kan vara för stor eller ta för lång tid`);
+        return;
+      }
       const data = await res.json() as ImportResult & { error?: string };
       if (!res.ok) {
         setImportError(data.error ?? "Import misslyckades");
