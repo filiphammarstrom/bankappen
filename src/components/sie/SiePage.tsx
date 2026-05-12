@@ -45,8 +45,8 @@ export function SiePage({ companyId }: { companyId: string }) {
         setSelectedFile(null);
         if (fileRef.current) fileRef.current.value = "";
       }
-    } catch {
-      setImportError("Nätverksfel – försök igen");
+    } catch (err) {
+      setImportError(`Nätverksfel: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImporting(false);
     }
