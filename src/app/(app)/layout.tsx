@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -18,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <TopBar />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
+      <ChatWidget />
     </div>
   );
 }
