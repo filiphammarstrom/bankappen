@@ -23,7 +23,7 @@ export async function GET(
     const company = await prisma.company.findUniqueOrThrow({ where: { id: params.companyId } });
     const filename = `${company.name.replace(/[^a-zA-Z0-9]/g, "_")}_SIE4.se`;
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/octet-stream",
         "Content-Disposition": `attachment; filename="${filename}"`,
