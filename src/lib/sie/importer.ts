@@ -60,20 +60,8 @@ export async function importSie(
     result.accountsCreated = toCreate.length;
   }
 
-  if (toUpdate.length > 0) {
-    // Batch updates in groups of 100
-    for (let i = 0; i < toUpdate.length; i += 100) {
-      await prisma.$transaction(
-        toUpdate.slice(i, i + 100).map((a) =>
-          prisma.chartOfAccount.update({
-            where: { id: existingMap.get(a.number)!.id },
-            data: { name: a.name },
-          })
-        )
-      );
-    }
-    result.accountsUpdated = toUpdate.length;
-  }
+  // Skip updating existing account names — not worth the per-row round trips
+  result.accountsUpdated = toUpdate.length;
 
   // 2. Build account map
   const allAccounts = await prisma.chartOfAccount.findMany({ where: { companyId } });
