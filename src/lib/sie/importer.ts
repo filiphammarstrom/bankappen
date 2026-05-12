@@ -37,32 +37,41 @@ export async function importSie(
     skipped: 0,
   };
 
-  // 1. Upsert chart of accounts
-  for (const acc of sie.accounts) {
-    if (!acc.number || isNaN(acc.number)) continue;
-    const existing = await prisma.chartOfAccount.findUnique({
-      where: { companyId_accountNumber: { companyId, accountNumber: acc.number } },
+  const validAccounts = sie.accounts.filter((a) => a.number && !isNaN(a.number));
+
+  // 1. Batch upsert accounts — one query to fetch existing, then createMany + batch updates
+  const existing = await prisma.chartOfAccount.findMany({ where: { companyId } });
+  const existingMap = new Map(existing.map((a) => [a.accountNumber, a]));
+
+  const toCreate = validAccounts.filter((a) => !existingMap.has(a.number));
+  const toUpdate = validAccounts.filter((a) => existingMap.has(a.number));
+
+  if (toCreate.length > 0) {
+    await prisma.chartOfAccount.createMany({
+      data: toCreate.map((a) => ({
+        companyId,
+        accountNumber: a.number,
+        name: a.name,
+        type: sieAccountType(a.number),
+      })),
+      skipDuplicates: true,
     });
-    if (existing) {
-      await prisma.chartOfAccount.update({
-        where: { id: existing.id },
-        data: { name: acc.name },
-      });
-      result.accountsUpdated++;
-    } else {
-      await prisma.chartOfAccount.create({
-        data: {
-          companyId,
-          accountNumber: acc.number,
-          name: acc.name,
-          type: sieAccountType(acc.number),
-        },
-      });
-      result.accountsCreated++;
-    }
+    result.accountsCreated = toCreate.length;
   }
 
-  // 2. Resolve account id map
+  if (toUpdate.length > 0) {
+    await prisma.$transaction(
+      toUpdate.map((a) =>
+        prisma.chartOfAccount.update({
+          where: { id: existingMap.get(a.number)!.id },
+          data: { name: a.name },
+        })
+      )
+    );
+    result.accountsUpdated = toUpdate.length;
+  }
+
+  // 2. Resolve account id map (re-fetch after creates)
   const allAccounts = await prisma.chartOfAccount.findMany({ where: { companyId } });
   const accountMap = new Map(allAccounts.map((a) => [a.accountNumber, a.id]));
 
@@ -71,9 +80,7 @@ export async function importSie(
   if (sie.fiscalYearStart && sie.fiscalYearEnd) {
     const start = sieToIsoDate(sie.fiscalYearStart);
     const end = sieToIsoDate(sie.fiscalYearEnd);
-    fiscalYear = await prisma.fiscalYear.findFirst({
-      where: { companyId, startDate: start },
-    });
+    fiscalYear = await prisma.fiscalYear.findFirst({ where: { companyId, startDate: start } });
     if (!fiscalYear) {
       fiscalYear = await prisma.fiscalYear.create({
         data: { companyId, startDate: start, endDate: end },
@@ -81,16 +88,15 @@ export async function importSie(
     }
   }
 
-  // 4. Import opening balances (IB year=0 only)
+  // 4. Import opening balances
   const ibEntries = sie.openingBalances.filter((b) => b.year === 0 && b.amount !== 0);
   if (ibEntries.length > 0) {
-    // Delete old opening balance entry if exists
-    await prisma.journalEntry.deleteMany({
-      where: { companyId, source: "OPENING_BALANCE" },
-    });
+    await prisma.journalEntry.deleteMany({ where: { companyId, source: "OPENING_BALANCE" } });
 
     const nextNum = await getNextEntryNumber(companyId);
-    const entry = await prisma.journalEntry.create({
+    const ibLines = ibEntries.filter((b) => accountMap.has(b.accountNumber));
+
+    await prisma.journalEntry.create({
       data: {
         companyId,
         fiscalYearId: fiscalYear?.id ?? null,
@@ -100,59 +106,65 @@ export async function importSie(
         source: "OPENING_BALANCE",
         createdByUserId: userId,
         lines: {
-          create: ibEntries
-            .filter((b) => accountMap.has(b.accountNumber))
-            .map((b) => {
-              const accId = accountMap.get(b.accountNumber)!;
-              return b.amount > 0
-                ? { debitAccountId: accId, creditAccountId: null, amountSek: b.amount }
-                : { debitAccountId: null, creditAccountId: accId, amountSek: Math.abs(b.amount) };
-            }),
+          create: ibLines.map((b) => {
+            const accId = accountMap.get(b.accountNumber)!;
+            return b.amount > 0
+              ? { debitAccountId: accId, creditAccountId: null, amountSek: b.amount }
+              : { debitAccountId: null, creditAccountId: accId, amountSek: Math.abs(b.amount) };
+          }),
         },
       },
     });
-    result.openingBalancesImported = ibEntries.length;
-    void entry;
+    result.openingBalancesImported = ibLines.length;
   }
 
-  // 5. Import verifications
-  // Delete existing SIE-imported verifications to allow re-import
+  // 5. Import verifications in batches to avoid timeouts
   await prisma.journalEntry.deleteMany({
     where: { companyId, source: "MANUAL", description: { contains: "[SIE]" } },
   });
 
   let entryCounter = await getNextEntryNumber(companyId);
 
-  for (const ver of sie.verifications) {
-    const validTrans = ver.transactions.filter(
-      (t) => t.amount !== 0 && accountMap.has(t.accountNumber)
+  // Build valid verification list first
+  const validVers = sie.verifications
+    .map((ver) => ({
+      ver,
+      lines: ver.transactions.filter((t) => t.amount !== 0 && accountMap.has(t.accountNumber)),
+    }))
+    .filter(({ lines }) => lines.length > 0);
+
+  result.skipped = sie.verifications.length - validVers.length;
+
+  // Process in batches of 50 to avoid transaction size limits
+  const BATCH = 50;
+  for (let i = 0; i < validVers.length; i += BATCH) {
+    const chunk = validVers.slice(i, i + BATCH);
+    await prisma.$transaction(
+      chunk.map(({ ver, lines }) => {
+        const entryDate = ver.date ? sieToIsoDate(ver.date) : new Date();
+        return prisma.journalEntry.create({
+          data: {
+            companyId,
+            fiscalYearId: fiscalYear?.id ?? null,
+            entryNumber: entryCounter++,
+            entryDate,
+            description: `[SIE] ${ver.series}${ver.number} ${ver.description}`.trim(),
+            source: "MANUAL",
+            createdByUserId: userId,
+            lines: {
+              create: lines.map((t) => {
+                const accId = accountMap.get(t.accountNumber)!;
+                return t.amount > 0
+                  ? { debitAccountId: accId, creditAccountId: null, amountSek: t.amount, description: t.description || null }
+                  : { debitAccountId: null, creditAccountId: accId, amountSek: Math.abs(t.amount), description: t.description || null };
+              }),
+            },
+          },
+        });
+      })
     );
-    if (validTrans.length === 0) { result.skipped++; continue; }
-
-    const entryDate = ver.date ? sieToIsoDate(ver.date) : new Date();
-
-    await prisma.journalEntry.create({
-      data: {
-        companyId,
-        fiscalYearId: fiscalYear?.id ?? null,
-        entryNumber: entryCounter++,
-        entryDate,
-        description: `[SIE] ${ver.series}${ver.number} ${ver.description}`.trim(),
-        source: "MANUAL",
-        createdByUserId: userId,
-        lines: {
-          create: validTrans.map((t) => {
-            const accId = accountMap.get(t.accountNumber)!;
-            return t.amount > 0
-              ? { debitAccountId: accId, creditAccountId: null, amountSek: t.amount, description: t.description || null }
-              : { debitAccountId: null, creditAccountId: accId, amountSek: Math.abs(t.amount), description: t.description || null };
-          }),
-        },
-      },
-    });
-
-    result.verificationsImported++;
-    result.transactionsImported += validTrans.length;
+    result.verificationsImported += chunk.length;
+    result.transactionsImported += chunk.reduce((s, { lines }) => s + lines.length, 0);
   }
 
   return result;
