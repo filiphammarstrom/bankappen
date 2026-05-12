@@ -8,7 +8,8 @@ function sieStr(s: string | null | undefined): string {
   return `"${(s ?? "").replace(/"/g, "'")}"`;
 }
 
-function sieAmount(n: number | string): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sieAmount(n: any): string {
   return Number(n).toFixed(2);
 }
 
