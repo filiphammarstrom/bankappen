@@ -60,6 +60,16 @@ export default async function CompanySettingsPage({
         <h2 className="text-lg font-semibold text-gray-900 mb-3">Inkommande e-post</h2>
         <InboundEmailBox companyId={company.id} companyName={company.name} />
       </div>
+
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Bokföring</h2>
+        <Link
+          href={`/companies/${company.id}/sie`}
+          className="inline-flex items-center gap-2 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          SIE-import / export →
+        </Link>
+      </div>
     </div>
   );
 }
