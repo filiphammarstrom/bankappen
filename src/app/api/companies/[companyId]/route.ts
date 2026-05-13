@@ -18,6 +18,7 @@ const UpdateCompanySchema = z.object({
   vatPeriod: z.enum(["MONTHLY", "QUARTERLY", "YEARLY"]),
   fTaxCertificate: z.boolean(),
   fiscalYearStart: z.number().int().min(1).max(12),
+  invoiceCounter: z.number().int().min(0).optional(),
 });
 
 export async function PATCH(
@@ -64,6 +65,7 @@ export async function PATCH(
         vatPeriod: data.vatPeriod,
         fTaxCertificate: data.fTaxCertificate,
         fiscalYearStart: data.fiscalYearStart,
+        ...(data.invoiceCounter !== undefined && { invoiceCounter: data.invoiceCounter }),
       },
     });
 

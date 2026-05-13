@@ -18,6 +18,7 @@ interface Company {
   vatPeriod: "MONTHLY" | "QUARTERLY" | "YEARLY";
   fTaxCertificate: boolean;
   fiscalYearStart: number;
+  invoiceCounter: number;
 }
 
 export function CompanySettingsForm({ company }: { company: Company }) {
@@ -39,6 +40,7 @@ export function CompanySettingsForm({ company }: { company: Company }) {
   const [vatPeriod, setVatPeriod] = useState<"MONTHLY" | "QUARTERLY" | "YEARLY">(company.vatPeriod);
   const [fTaxCertificate, setFTaxCertificate] = useState(company.fTaxCertificate);
   const [fiscalYearStart, setFiscalYearStart] = useState(String(company.fiscalYearStart));
+  const [nextInvoiceNumber, setNextInvoiceNumber] = useState(String(company.invoiceCounter + 1));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,6 +53,12 @@ export function CompanySettingsForm({ company }: { company: Company }) {
     const fiscalStart = parseInt(fiscalYearStart, 10);
     if (isNaN(fiscalStart) || fiscalStart < 1 || fiscalStart > 12) {
       setError("Räkenskapsårets startmånad måste vara 1–12");
+      return;
+    }
+
+    const nextNum = parseInt(nextInvoiceNumber, 10);
+    if (isNaN(nextNum) || nextNum < 1) {
+      setError("Nästa fakturanummer måste vara ett positivt heltal");
       return;
     }
 
@@ -73,6 +81,7 @@ export function CompanySettingsForm({ company }: { company: Company }) {
           vatPeriod,
           fTaxCertificate,
           fiscalYearStart: fiscalStart,
+          invoiceCounter: nextNum - 1,
         }),
       });
 
@@ -233,6 +242,21 @@ export function CompanySettingsForm({ company }: { company: Company }) {
               <option key={val} value={val}>{label}</option>
             ))}
           </select>
+        </div>
+
+        {/* Invoice numbering */}
+        <div>
+          <label className={labelClass}>Nästa fakturanummer</label>
+          <input
+            type="number"
+            min={1}
+            value={nextInvoiceNumber}
+            onChange={(e) => setNextInvoiceNumber(e.target.value)}
+            className={inputClass}
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Nästa faktura får nummer {new Date().getFullYear()}-{String(parseInt(nextInvoiceNumber) || 1).padStart(4, "0")}
+          </p>
         </div>
 
         {/* F-tax */}

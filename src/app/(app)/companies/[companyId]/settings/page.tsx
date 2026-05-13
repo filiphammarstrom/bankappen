@@ -54,6 +54,7 @@ export default async function CompanySettingsPage({
           vatPeriod: company.vatPeriod,
           fTaxCertificate: company.fTaxCertificate,
           fiscalYearStart: company.fiscalYearStart,
+          invoiceCounter: company.invoiceCounter,
         }}
       />
 
