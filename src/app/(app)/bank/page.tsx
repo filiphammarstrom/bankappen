@@ -5,9 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { getActiveCompany } from "@/lib/company-context";
 import { formatCurrency, formatDate, toNumber } from "@/lib/utils";
 import Link from "next/link";
-import { Landmark, Link2, AlertCircle } from "lucide-react";
+import { Landmark, Link2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { BankSyncButton } from "@/components/bank/BankSyncButton";
 
-export default async function BankPage() {
+export default async function BankPage({
+  searchParams,
+}: {
+  searchParams: { connected?: string; error?: string };
+}) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
 
@@ -22,6 +27,7 @@ export default async function BankPage() {
         take: 10,
       },
     },
+    orderBy: { createdAt: "asc" },
   });
 
   return (
@@ -34,13 +40,13 @@ export default async function BankPage() {
         <div className="flex gap-2">
           <Link
             href="/bank/import"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
           >
             Importera bankutdrag
           </Link>
           <Link
             href="/bank/connect"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
           >
             <Link2 size={16} />
             Anslut bank
@@ -48,23 +54,19 @@ export default async function BankPage() {
         </div>
       </div>
 
-      {/* Stub notice */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
-        <AlertCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-amber-800">Bankintegration (Tink) – Under utveckling</p>
-          <p className="text-sm text-amber-700 mt-1">
-            Bankintegration via Tink är konfigurerad men kräver ett aktivt Tink-konto.
-            Sätt <code className="bg-amber-100 px-1 rounded">TINK_ENABLED=true</code> och konfigurera
-            dina Tink-uppgifter för att aktivera funktionen.
-          </p>
-          <p className="text-sm text-amber-700 mt-1">
-            <a href="https://console.tink.com" target="_blank" rel="noopener noreferrer" className="underline">
-              Registrera dig på Tink Console →
-            </a>
-          </p>
+      {/* Feedback banners */}
+      {searchParams.connected === "1" && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">
+          <CheckCircle2 size={16} className="text-green-500" />
+          Bankkonto anslutet. Klicka "Synka" för att hämta transaktioner.
         </div>
-      </div>
+      )}
+      {searchParams.error && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <AlertCircle size={16} />
+          Bankanslutning misslyckades: {decodeURIComponent(searchParams.error)}
+        </div>
+      )}
 
       {connections.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
@@ -73,62 +75,80 @@ export default async function BankPage() {
           <p className="text-gray-500 mb-4">
             Anslut ditt företagskonto för att importera transaktioner och stämma av mot fakturor.
           </p>
-          <Link
-            href="/bank/connect"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            <Link2 size={16} />
-            Anslut bank
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/bank/connect"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+            >
+              <Link2 size={16} />
+              Anslut bank via Tink
+            </Link>
+            <Link
+              href="/bank/import"
+              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm"
+            >
+              Importera CSV-fil
+            </Link>
+          </div>
         </div>
       ) : (
-        connections.map((conn) => (
-          <div key={conn.id} className="bg-white rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <div>
-                <h3 className="font-semibold text-gray-900">{conn.accountName}</h3>
-                <p className="text-sm text-gray-500">
-                  {conn.provider} · {conn.iban ?? "IBAN ej angiven"}
-                </p>
-                {conn.lastSyncedAt && (
-                  <p className="text-xs text-gray-400">Senast synkad: {formatDate(conn.lastSyncedAt)}</p>
+        <>
+          {/* Sync button for Tink connections */}
+          {connections.some((c) => c.provider === "tink") && (
+            <BankSyncButton />
+          )}
+
+          {connections.map((conn) => (
+            <div key={conn.id} className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+                <div>
+                  <h3 className="font-semibold text-gray-900">{conn.accountName}</h3>
+                  <p className="text-sm text-gray-500">
+                    {conn.provider === "manual_import" ? "Manuell import" : conn.provider} ·{" "}
+                    {conn.iban ?? "IBAN ej angiven"}
+                  </p>
+                  {conn.lastSyncedAt && (
+                    <p className="text-xs text-gray-400">
+                      Senast synkad: {formatDate(conn.lastSyncedAt)}
+                    </p>
+                  )}
+                </div>
+                <Link href="/bank/reconcile" className="text-sm text-blue-600 hover:text-blue-700">
+                  Stämma av
+                </Link>
+              </div>
+
+              <div className="divide-y divide-gray-100">
+                {conn.transactions.length === 0 ? (
+                  <p className="px-5 py-4 text-sm text-gray-500">Inga transaktioner</p>
+                ) : (
+                  conn.transactions.map((tx) => (
+                    <div key={tx.id} className="flex items-center justify-between px-5 py-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {tx.merchantName ?? tx.description}
+                        </p>
+                        <p className="text-xs text-gray-500">{formatDate(tx.transactionDate)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`text-sm font-medium ${
+                            toNumber(tx.amount) >= 0 ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          {formatCurrency(toNumber(tx.amount))}
+                        </p>
+                        {tx.reconciled && (
+                          <span className="text-xs text-green-500">Avstämd</span>
+                        )}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
-              <Link
-                href="/bank/reconcile"
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                Stämma av
-              </Link>
             </div>
-
-            {/* Recent transactions */}
-            <div className="divide-y divide-gray-100">
-              {conn.transactions.length === 0 ? (
-                <p className="px-5 py-4 text-sm text-gray-500">Inga transaktioner</p>
-              ) : (
-                conn.transactions.map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between px-5 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {tx.merchantName ?? tx.description}
-                      </p>
-                      <p className="text-xs text-gray-500">{formatDate(tx.transactionDate)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-medium ${toNumber(tx.amount) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {formatCurrency(toNumber(tx.amount))}
-                      </p>
-                      {tx.reconciled && (
-                        <span className="text-xs text-green-500">Avstämd</span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        ))
+          ))}
+        </>
       )}
     </div>
   );
